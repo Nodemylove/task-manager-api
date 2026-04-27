@@ -31,5 +31,5 @@ app.listen(PORT, () => {
   console.log(`🚀 Server on http://localhost:${PORT}`);
   console.log(`📖 Swagger  http://localhost:${PORT}/api-docs`);
 });
-
+//expo
 module.exports = app;
