@@ -7,6 +7,7 @@ const swaggerSpec  = require('./swagger/swagger');
 const logger       = require('./middleware/logger');
 const errorHandler = require('./middleware/errorHandler');
 const app          = express();
+const authRoutes =require('./routes/auth.routes');
 
 // ── middleware ──────────────────────────────
 app.use(express.json());           // parse JSON request bodies
@@ -22,7 +23,8 @@ app.get('/', (req, res) => {
 
 // ── routes ───────────────────────────────────
 // (auth + task routes added from Day 3 onwards)
-
+// ── NEW: mount auth routes ───────────────
+app.use('/auth', authRoutes);
 // ── global error handler (MUST be last) ──────
 app.use(errorHandler);
 
