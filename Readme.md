@@ -1,6 +1,6 @@
 - [x] Day 1 — Setup + Docker + PostgreSQL connection
 - [x] Day 2 — Knex migrations (users, categories, tasks, refresh_tokens tables)
-- [ ] Day 3 — Auth + JWT
+- [x] Day 3 — Auth + JWT
 - [ ] Day 4 — Tasks CRUD
 - [ ] Day 5 — Categories + SQL JOIN
 - [ ] Day 6 — Zod + AppError
