@@ -1,32 +1,25 @@
-require('dotenv').config();        // ALWAYS first line
-require('./db/knex');              // connect to PostgreSQL on startup
+require('dotenv').config();
+require('./db/knex');
 
 const express      = require('express');
 const swaggerUi    = require('swagger-ui-express');
 const swaggerSpec  = require('./swagger/swagger');
 const logger       = require('./middleware/logger');
 const errorHandler = require('./middleware/errorHandler');
-const app          = express();
-const authRoutes =require('./routes/auth.routes');
+const authRoutes   = require('./routes/auth.routes');
+const taskRoutes   = require('./routes/task.routes'); // NEW
 
-// ── middleware ──────────────────────────────
-app.use(express.json());           // parse JSON request bodies
-app.use(logger);                   // log every request to terminal
-
-// ── swagger docs ─────────────────────────────
+const app = express();
+app.use(express.json());
+app.use(logger);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-// ── health check ─────────────────────────────
-app.get('/', (req, res) => {
-  res.json({ message: 'task-manager-api running', version: '1.0.0' });
-});
+app.get('/', (req, res) => res.json({ message: 'task-manager-api running' }));
 
-// ── routes ───────────────────────────────────
-// (auth + task routes added from Day 3 onwards)
-// ── NEW: mount auth routes ───────────────
-app.use('/auth', authRoutes);
-// ── global error handler (MUST be last) ──────
-app.use(errorHandler);
+app.use('/auth',  authRoutes);
+app.use('/tasks', taskRoutes); // NEW — all task routes live under /tasks
+
+app.use(errorHandler); // always last
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
