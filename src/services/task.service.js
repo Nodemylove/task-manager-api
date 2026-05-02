@@ -12,15 +12,17 @@ async function getTaskById(id, userId) {
 
   return task;
 }
-async function createTask(userId, body) {
-  // spread the validated body, then add user_id
-  // body comes from req.body (already validated by Zod)
-  // user_id comes from req.user.userId (set by protect.js)
-  const data = {
-    ...body,       // title, description, status, priority, category_id
-    user_id: userId, // ownership — which user created this task
-  };
+const categoryQ = require('../queries/category.queries'); // add this import
 
+async function createTask(userId, body) {
+
+  // if category_id was provided, verify it actually exists
+  if (body.category_id) {
+    const category = await categoryQ.findById(body.category_id);
+    if (!category) throw new AppError('Category not found', 404);
+  }
+
+  const data = { ...body, user_id: userId };
   return taskQ.createTask(data);
 }
 async function updateTask(id, userId, body) {

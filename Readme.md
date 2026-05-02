@@ -2,7 +2,7 @@
 - [x] Day 2 — Knex migrations (users, categories, tasks, refresh_tokens tables)
 - [x] Day 3 — Auth + JWT
 - [x] Day 4 — Tasks CRUD
-- [ ] Day 5 — Categories + SQL JOIN
+- [x] Day 5 — Categories + SQL JOIN
 - [ ] Day 6 — Zod + AppError
 - [ ] Day 7 — Pagination + filtering
 - [ ] Day 8 — Swagger docs + polish
