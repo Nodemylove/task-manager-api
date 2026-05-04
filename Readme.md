@@ -3,6 +3,6 @@
 - [x] Day 3 — Auth + JWT
 - [x] Day 4 — Tasks CRUD
 - [x] Day 5 — Categories + SQL JOIN
-- [ ] Day 6 — Zod + AppError
+- [x] Day 6 — Zod + AppError
 - [ ] Day 7 — Pagination + filtering
 - [ ] Day 8 — Swagger docs + polish
