@@ -1,46 +1,75 @@
-
 const taskService = require('../services/task.service');
+const AppError    = require('../utils/AppError');
 
-// GET /tasks — all tasks belonging to logged-in user
+// GET /tasks — with pagination + filter + search
 async function getAll(req, res, next) {
   try {
-    const tasks = await taskService.getAllTasks(req.user.userId);
-    res.status(200).json({ success: true, count: tasks.length, data: tasks });
+    // read all query params from URL
+    // GET /tasks?page=2&limit=5&status=done&search=buy&sort=asc
+    const { page, limit, status, priority, category_id, search, sort } = req.query;
+
+    // sanitize page and limit — must be positive integers
+    const pageNum  = Math.max(1, Number(page)  || 1);
+    const limitNum = Math.min(100, Math.max(1, Number(limit) || 10)); // cap at 100
+
+    // validate status — only allowed values
+    const validStatuses = ['pending', 'in_progress', 'done'];
+    if (status && !validStatuses.includes(status)) {
+      return next(new AppError('status must be pending, in_progress or done', 400));
+    }
+
+    // validate priority
+    const validPriorities = ['low', 'medium', 'high'];
+    if (priority && !validPriorities.includes(priority)) {
+      return next(new AppError('priority must be low, medium or high', 400));
+    }
+
+    // validate sort direction
+    const sortDir = ['asc', 'desc'].includes(sort) ? sort : 'desc';
+
+    // build options object and pass to service
+    const options = {
+      page:        pageNum,
+      limit:       limitNum,
+      status:      status      || undefined,
+      priority:    priority    || undefined,
+      category_id: category_id || undefined,
+      search:      search      || undefined,
+      sort:        sortDir,
+    };
+
+    const result = await taskService.getAllTasks(req.user.userId, options);
+
+    res.status(200).json({
+      success: true,
+      data:    result.tasks,
+      meta:    result.meta,
+    });
   } catch (err) { next(err); }
 }
 
-// GET /tasks/:id — one task (must belong to logged-in user)
+// getOne, create, update, remove — unchanged
 async function getOne(req, res, next) {
   try {
-    // req.params.id is a string — convert to Number for SQL
     const task = await taskService.getTaskById(Number(req.params.id), req.user.userId);
     res.status(200).json({ success: true, data: task });
   } catch (err) { next(err); }
 }
 
-// POST /tasks — create a new task
 async function create(req, res, next) {
   try {
-    // req.body = validated task data (from Zod)
-    // req.user.userId = logged-in user's id (from protect.js)
     const task = await taskService.createTask(req.user.userId, req.body);
     res.status(201).json({ success: true, data: task });
   } catch (err) { next(err); }
 }
 
-// PATCH /tasks/:id — partial update
 async function update(req, res, next) {
   try {
-    const task = await taskService.updateTask(
-      Number(req.params.id),
-      req.user.userId,
-      req.body
-    );
+    const task = await taskService.updateTask(Number(req.params.id), req.user.userId, req.body);
     res.status(200).json({ success: true, data: task });
   } catch (err) { next(err); }
 }
 
-// DELETE /tasks/:id — delete a task
 async function remove(req, res, next) {
   try {
     await taskService.deleteTask(Number(req.params.id), req.user.userId);

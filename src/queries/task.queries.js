@@ -1,17 +1,46 @@
-const db=require('../db/knex');
-// ── FIND ALL BY USER — with LEFT JOIN ─────────────────────────
-async function findAllByUser(userId) {
-  return db('tasks')
-    .where('tasks.user_id', userId)
+const db = require('../db/knex');
 
-    // LEFT JOIN: combine tasks with categories table
-    // 'categories.id' = the column to match ON from categories table
-    // 'tasks.category_id' = the column to match ON from tasks table
-    // SQL: LEFT JOIN categories ON categories.id = tasks.category_id
-    .leftJoin('categories', 'categories.id', 'tasks.category_id')
+// ── FIND ALL BY USER — with pagination + filter + search ──────
+async function findAllByUser(userId, {
+  page     = 1,
+  limit    = 10,
+  status,
+  priority,
+  category_id,
+  search,
+  sort     = 'desc'
+} = {}) {
 
-    // select SPECIFIC columns — not .select('*') to avoid column name conflicts
-    // 'tasks.id' not just 'id' because categories also has an 'id' — must be explicit
+  const offset  = (page - 1) * limit;           // key formula — same as file-log-api
+  const sortDir = sort === 'asc' ? 'asc' : 'desc';
+
+  // ── BASE QUERY — shared between data + count ─────────────────
+  // start with the ownership filter — always required
+  let baseQuery = db('tasks').where('tasks.user_id', userId);
+
+  // add optional filters — only if the param was provided
+  if (status)      baseQuery = baseQuery.where('tasks.status', status);
+  if (priority)    baseQuery = baseQuery.where('tasks.priority', priority);
+  if (category_id) baseQuery = baseQuery.where('tasks.category_id', Number(category_id));
+
+  // case-insensitive title search
+  // whereILike = PostgreSQL ILIKE — same as $regex with $options:'i'
+  // % before and after = contains anywhere in the string
+  if (search)      baseQuery = baseQuery.whereILike('tasks.title', `%${search}%`);
+
+  // ── COUNT QUERY — same filters, no JOIN, no pagination ───────
+  // clone base query before adding JOIN (avoids duplicate count from JOIN)
+  // count only tasks.id — clean and accurate
+  const countResult = await baseQuery
+    .clone()
+    .count('tasks.id as total')
+    .first();
+
+  const total = parseInt(countResult.total) || 0;
+
+  // ── DATA QUERY — with JOIN + sort + pagination ───────────────
+  const tasks = await baseQuery
+    .leftJoin('categories', 'tasks.category_id', 'categories.id')
     .select(
       'tasks.id',
       'tasks.title',
@@ -22,69 +51,55 @@ async function findAllByUser(userId) {
       'tasks.user_id',
       'tasks.created_at',
       'tasks.updated_at',
-      // AS renames the column in the response
-      // if no category: category_name will be null (LEFT JOIN behaviour)
       'categories.name as category_name'
     )
-    .orderBy('tasks.created_at', 'desc');
+    .orderBy('tasks.created_at', sortDir)
+    .limit(limit)
+    .offset(offset);               // .offset() not .skip() — Knex syntax
+
+  return {
+    tasks,
+    meta: {
+      total,
+      page:  Number(page),
+      limit: Number(limit),
+      pages: Math.ceil(total / limit) || 1,
+    }
+  };
 }
 
-// ── FIND ONE BY ID AND USER — with LEFT JOIN ──────────────────
+// findByIdAndUser, createTask, updateTask, deleteTask — unchanged
 async function findByIdAndUser(id, userId) {
   return db('tasks')
     .where('tasks.id', id)
     .where('tasks.user_id', userId)
-    .leftJoin('categories', 'categories.id', 'tasks.category_id')
+    .leftJoin('categories', 'tasks.category_id', 'categories.id')
     .select(
-      'tasks.id',
-      'tasks.title',
-      'tasks.description',
-      'tasks.status',
-      'tasks.priority',
-      'tasks.category_id',
-      'tasks.user_id',
-      'tasks.created_at',
-      'tasks.updated_at',
+      'tasks.id', 'tasks.title', 'tasks.description',
+      'tasks.status', 'tasks.priority', 'tasks.category_id',
+      'tasks.user_id', 'tasks.created_at', 'tasks.updated_at',
       'categories.name as category_name'
     )
     .first();
 }
 
-
-// ── CREATE TASK ───────────────────────────────────────────────
-// inserts a new task and returns the full created row
-// SQL: INSERT INTO tasks (...) VALUES (...) RETURNING *
 async function createTask(data) {
-  // .returning('*') = return ALL columns of the inserted row
-  // without it, Knex only returns the number of rows inserted
+  const [task] = await db('tasks').insert(data).returning('*');
+  return task;
+}
+
+async function updateTask(id, userId, data) {
   const [task] = await db('tasks')
-    .insert(data)
+    .where({ id, user_id: userId })
+    .update({ ...data, updated_at: new Date() })
     .returning('*');
   return task;
 }
-// ── UPDATE TASK ───────────────────────────────────────────────
-// updates ONLY if the task belongs to this user
-// returns the updated row or undefined if not found
-// SQL: UPDATE tasks SET ... WHERE id = ? AND user_id = ? RETURNING *
-async function updateTask(id, userId, data) {
-  const [task] = await db('tasks')
-    .where({ id, user_id: userId })      // ownership check in the query itself
-    .update({
-      ...data,
-      updated_at: new Date(),            // manually update the timestamp
-    })
-    .returning('*');
-  return task;                           // undefined if no row matched
-}
-// ── DELETE TASK ───────────────────────────────────────────────
-// deletes ONLY if the task belongs to this user
-// returns number of deleted rows (0 or 1)
-// SQL: DELETE FROM tasks WHERE id = ? AND user_id = ?
+
 async function deleteTask(id, userId) {
-  return db('tasks')
-    .where({ id, user_id: userId })      // ownership check — always both conditions
-    .delete();                           // returns count of deleted rows
+  return db('tasks').where({ id, user_id: userId }).delete();
 }
+
 module.exports = {
   findAllByUser,
   findByIdAndUser,
